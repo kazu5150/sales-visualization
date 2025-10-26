@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Line, BarChart, Bar, ComposedChart, LineChart, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
-import { TrendingUp, DollarSign, ShoppingCart, Users } from 'lucide-react'
+import { TrendingUp, DollarSign, ShoppingCart, Users, ExternalLink } from 'lucide-react'
 import SalesPersonDetailModal from '@/components/SalesPersonDetailModal'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
@@ -123,20 +123,70 @@ export default function Dashboard() {
   const weeklyChartData = addCumulative(Object.values(weeklySales))
   const monthlyChartData = addCumulative(Object.values(monthlySales))
 
-  // カテゴリ別売上
-  const categorySales = salesData.reduce((acc, record) => {
-    const category = record.category || '未分類'
-    if (!acc[category]) {
-      acc[category] = 0
+  // カテゴリ別売上（日別）
+  const dailyCategorySales = salesData.reduce((acc, record) => {
+    const date = record.date
+    if (!acc[date]) {
+      acc[date] = {}
     }
-    acc[category] += Number(record.total_amount)
+    const category = record.category || '未分類'
+    if (!acc[date][category]) {
+      acc[date][category] = 0
+    }
+    acc[date][category] += Number(record.total_amount)
     return acc
-  }, {} as Record<string, number>)
+  }, {} as Record<string, Record<string, number>>)
 
-  const categoryChartData = Object.entries(categorySales).map(([category, amount]) => ({
-    category,
-    amount,
-  }))
+  // カテゴリ別売上（月別）
+  const monthlyCategorySales = salesData.reduce((acc, record) => {
+    const yearMonth = record.date.substring(0, 7) // YYYY-MM形式
+    if (!acc[yearMonth]) {
+      acc[yearMonth] = {}
+    }
+    const category = record.category || '未分類'
+    if (!acc[yearMonth][category]) {
+      acc[yearMonth][category] = 0
+    }
+    acc[yearMonth][category] += Number(record.total_amount)
+    return acc
+  }, {} as Record<string, Record<string, number>>)
+
+  // チャート用のデータに変換
+  const getDailyCategoryChartData = () => {
+    const allCategories = new Set<string>()
+    Object.values(dailyCategorySales).forEach(categories => {
+      Object.keys(categories).forEach(cat => allCategories.add(cat))
+    })
+
+    return Object.entries(dailyCategorySales).map(([date, categories]) => ({
+      date,
+      ...categories
+    }))
+  }
+
+  const getMonthlyCategoryChartData = () => {
+    const allCategories = new Set<string>()
+    Object.values(monthlyCategorySales).forEach(categories => {
+      Object.keys(categories).forEach(cat => allCategories.add(cat))
+    })
+
+    return Object.entries(monthlyCategorySales).map(([date, categories]) => ({
+      date,
+      ...categories
+    }))
+  }
+
+  // 全カテゴリのリストを取得
+  const allCategories = Array.from(new Set(salesData.map(r => r.category || '未分類')))
+
+  // カテゴリごとの色を定義
+  const categoryColors = [
+    '#8b5cf6', '#60a5fa', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316'
+  ]
+  const categoryColorMap = allCategories.reduce((acc, cat, idx) => {
+    acc[cat] = categoryColors[idx % categoryColors.length]
+    return acc
+  }, {} as Record<string, string>)
 
   // 営業担当者の一覧を取得
   const salesPersonList = Array.from(new Set(salesData.map(r => r.sales_person)))
@@ -161,11 +211,28 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         {/* ヘッダー */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
-            Sales Visualization
-          </h1>
-          <p className="text-slate-400">営業データをリアルタイムで可視化</p>
+        <div className="text-center space-y-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">
+              Sales Visualization
+            </h1>
+            <p className="text-slate-400">営業データをリアルタイムで可視化</p>
+          </div>
+
+          {/* スプレッドシートへのリンクボタン */}
+          {process.env.NEXT_PUBLIC_SPREADSHEET_URL && (
+            <div className="flex justify-center">
+              <a
+                href={process.env.NEXT_PUBLIC_SPREADSHEET_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+              >
+                <ExternalLink className="h-5 w-5" />
+                <span>スプレッドシートを開く</span>
+              </a>
+            </div>
+          )}
         </div>
 
         {/* KPIカード */}
@@ -308,23 +375,72 @@ export default function Dashboard() {
               <CardDescription className="text-slate-400">商品カテゴリ別の売上分析</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={categoryChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="category" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#1e293b',
-                      border: '1px solid #334155',
-                      borderRadius: '8px',
-                      color: '#e2e8f0'
-                    }}
-                  />
-                  <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                  <Bar dataKey="amount" fill="#8b5cf6" name="売上金額" />
-                </BarChart>
-              </ResponsiveContainer>
+              <Tabs defaultValue="daily" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 bg-slate-700/50 mb-4">
+                  <TabsTrigger value="daily" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                    日別
+                  </TabsTrigger>
+                  <TabsTrigger value="monthly" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                    月別
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="daily" className="mt-0">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={getDailyCategoryChartData()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          color: '#e2e8f0'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                      {allCategories.map((category) => (
+                        <Bar
+                          key={category}
+                          dataKey={category}
+                          fill={categoryColorMap[category]}
+                          name={category}
+                          stackId="a"
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+
+                <TabsContent value="monthly" className="mt-0">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={getMonthlyCategoryChartData()}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                      <YAxis stroke="#94a3b8" />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: '#1e293b',
+                          border: '1px solid #334155',
+                          borderRadius: '8px',
+                          color: '#e2e8f0'
+                        }}
+                      />
+                      <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                      {allCategories.map((category) => (
+                        <Bar
+                          key={category}
+                          dataKey={category}
+                          fill={categoryColorMap[category]}
+                          name={category}
+                          stackId="a"
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
@@ -352,41 +468,61 @@ export default function Dashboard() {
             return (
               <Card
                 key={person}
-                className="bg-slate-800/50 border-slate-700 backdrop-blur-sm hover:bg-slate-800/70 transition-all cursor-pointer"
+                className="relative overflow-hidden bg-gradient-to-br from-slate-800/90 to-slate-900/90 backdrop-blur-sm cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl border-2"
+                style={{ borderColor: salesPersonColors[person] }}
                 onClick={() => {
                   setSelectedSalesPerson(person)
                   setIsModalOpen(true)
                 }}
               >
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg text-slate-200">{person}</CardTitle>
-                  <CardDescription className="text-slate-400 text-xs">クリックで詳細表示</CardDescription>
+                {/* カラフルなアクセントバー */}
+                <div
+                  className="absolute top-0 left-0 right-0 h-1"
+                  style={{ backgroundColor: salesPersonColors[person] }}
+                />
+
+                <CardHeader className="pb-3 pt-4">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-3 h-3 rounded-full animate-pulse"
+                      style={{ backgroundColor: salesPersonColors[person] }}
+                    />
+                    <CardTitle className="text-lg font-bold" style={{ color: salesPersonColors[person] }}>
+                      {person}
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-slate-400 text-xs mt-1">
+                    クリックで詳細表示 →
+                  </CardDescription>
                 </CardHeader>
+
                 <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs text-slate-500">総売上</p>
+                  <div className="bg-slate-900/50 rounded-lg p-3 border border-slate-700/50">
+                    <p className="text-xs text-slate-500 mb-1">総売上</p>
                     <p className="text-2xl font-bold" style={{ color: salesPersonColors[person] }}>
                       ¥{totalSales.toLocaleString()}
                     </p>
                   </div>
+
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
+                    <div className="bg-slate-900/30 rounded-lg p-2">
                       <p className="text-xs text-slate-500">平均売上</p>
-                      <p className="text-slate-300 font-semibold">¥{Math.round(avgSales).toLocaleString()}</p>
+                      <p className="text-slate-200 font-semibold">¥{Math.round(avgSales).toLocaleString()}</p>
                     </div>
-                    <div>
+                    <div className="bg-slate-900/30 rounded-lg p-2">
                       <p className="text-xs text-slate-500">受注件数</p>
-                      <p className="text-slate-300 font-semibold">{orderCount}件</p>
+                      <p className="text-slate-200 font-semibold">{orderCount}件</p>
                     </div>
                   </div>
-                  <div className="h-16">
+
+                  <div className="h-16 bg-slate-900/30 rounded-lg p-1">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={sparklineData}>
                         <Line
                           type="monotone"
                           dataKey="amount"
                           stroke={salesPersonColors[person]}
-                          strokeWidth={2}
+                          strokeWidth={2.5}
                           dot={false}
                         />
                       </LineChart>
