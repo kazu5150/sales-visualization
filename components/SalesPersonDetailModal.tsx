@@ -10,8 +10,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, ComposedChart } from 'recharts'
 import { TrendingUp, DollarSign, ShoppingCart, Target, Mail, Briefcase, Calendar } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 
 interface SalesRecord {
   id: string
@@ -110,7 +111,43 @@ export default function SalesPersonDetailModal({
     return acc
   }, {} as Record<string, { date: string; amount: number }>)
 
-  const dailyChartData = Object.values(dailySales)
+  // 週別売上データ
+  const weeklySales = salesData.reduce((acc, record) => {
+    const date = new Date(record.date)
+    const startOfWeek = new Date(date)
+    startOfWeek.setDate(date.getDate() - date.getDay())
+    const weekKey = startOfWeek.toISOString().split('T')[0]
+
+    if (!acc[weekKey]) {
+      acc[weekKey] = { date: weekKey, amount: 0 }
+    }
+    acc[weekKey].amount += Number(record.total_amount)
+    return acc
+  }, {} as Record<string, { date: string; amount: number }>)
+
+  // 月別売上データ
+  const monthlySales = salesData.reduce((acc, record) => {
+    const yearMonth = record.date.substring(0, 7)
+    if (!acc[yearMonth]) {
+      acc[yearMonth] = { date: yearMonth, amount: 0 }
+    }
+    acc[yearMonth].amount += Number(record.total_amount)
+    return acc
+  }, {} as Record<string, { date: string; amount: number }>)
+
+  // 累積売上を計算する関数
+  const addCumulative = (data: { date: string; amount: number }[]) => {
+    let cumulative = 0
+    return data.map((item) => {
+      cumulative += item.amount
+      return { ...item, cumulative }
+    })
+  }
+
+  // 各期間のデータを累積付きで作成
+  const dailyChartData = addCumulative(Object.values(dailySales))
+  const weeklyChartData = addCumulative(Object.values(weeklySales))
+  const monthlyChartData = addCumulative(Object.values(monthlySales))
 
   // 顧客別売上
   const customerSales = salesData.reduce((acc, record) => {
@@ -255,29 +292,89 @@ export default function SalesPersonDetailModal({
 
             {/* グラフセクション */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* 日別売上推移 */}
-              <Card className="bg-slate-800/50 border-slate-700">
+              {/* 売上推移（期間切り替え） */}
+              <Card className="bg-slate-800/50 border-slate-700 lg:col-span-2">
                 <CardHeader>
-                  <CardTitle className="text-slate-200">日別売上推移</CardTitle>
-                  <CardDescription className="text-slate-400">時系列での売上変動</CardDescription>
+                  <CardTitle className="text-slate-200">売上推移</CardTitle>
+                  <CardDescription className="text-slate-400">期間別の売上（棒）と累積売上（線）</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={dailyChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                      <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
-                      <YAxis stroke="#94a3b8" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: '#1e293b',
-                          border: '1px solid #334155',
-                          borderRadius: '8px',
-                          color: '#e2e8f0',
-                        }}
-                      />
-                      <Line type="monotone" dataKey="amount" stroke="#60a5fa" strokeWidth={2} name="売上" />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  <Tabs defaultValue="daily" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3 bg-slate-700/50 mb-4">
+                      <TabsTrigger value="daily" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                        日別
+                      </TabsTrigger>
+                      <TabsTrigger value="weekly" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                        週別
+                      </TabsTrigger>
+                      <TabsTrigger value="monthly" className="data-[state=active]:bg-slate-600 data-[state=active]:text-white">
+                        月別
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="daily" className="mt-0">
+                      <ResponsiveContainer width="100%" height={250}>
+                        <ComposedChart data={dailyChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                          <YAxis stroke="#94a3b8" fontSize={12} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1e293b',
+                              border: '1px solid #334155',
+                              borderRadius: '8px',
+                              color: '#e2e8f0',
+                            }}
+                          />
+                          <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                          <Bar dataKey="amount" fill="#60a5fa" name="日別売上" />
+                          <Line type="monotone" dataKey="cumulative" stroke="#f59e0b" strokeWidth={2} name="累積売上" />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </TabsContent>
+
+                    <TabsContent value="weekly" className="mt-0">
+                      <ResponsiveContainer width="100%" height={250}>
+                        <ComposedChart data={weeklyChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                          <YAxis stroke="#94a3b8" fontSize={12} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1e293b',
+                              border: '1px solid #334155',
+                              borderRadius: '8px',
+                              color: '#e2e8f0',
+                            }}
+                          />
+                          <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                          <Bar dataKey="amount" fill="#60a5fa" name="週別売上" />
+                          <Line type="monotone" dataKey="cumulative" stroke="#f59e0b" strokeWidth={2} name="累積売上" />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </TabsContent>
+
+                    <TabsContent value="monthly" className="mt-0">
+                      <ResponsiveContainer width="100%" height={250}>
+                        <ComposedChart data={monthlyChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                          <XAxis dataKey="date" stroke="#94a3b8" fontSize={12} />
+                          <YAxis stroke="#94a3b8" fontSize={12} />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1e293b',
+                              border: '1px solid #334155',
+                              borderRadius: '8px',
+                              color: '#e2e8f0',
+                            }}
+                          />
+                          <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                          <Bar dataKey="amount" fill="#60a5fa" name="月別売上" />
+                          <Line type="monotone" dataKey="cumulative" stroke="#f59e0b" strokeWidth={2} name="累積売上" />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
 
