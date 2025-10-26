@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { TrendingUp, DollarSign, ShoppingCart, Users } from 'lucide-react'
+import SalesPersonDetailModal from '@/components/SalesPersonDetailModal'
 
 interface SalesRecord {
   id: string
@@ -24,6 +25,8 @@ interface SalesRecord {
 export default function Dashboard() {
   const [salesData, setSalesData] = useState<SalesRecord[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedSalesPerson, setSelectedSalesPerson] = useState<string | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     fetchSalesData()
@@ -112,6 +115,14 @@ export default function Dashboard() {
     count: data.count,
     average: Math.round(data.total / data.count),
   }))
+
+  // 営業担当者のバーをクリックしたときの処理
+  const handleBarClick = (data: any) => {
+    if (data && data.name) {
+      setSelectedSalesPerson(data.name)
+      setIsModalOpen(true)
+    }
+  }
 
   if (loading) {
     return (
@@ -239,7 +250,7 @@ export default function Dashboard() {
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-slate-200">営業担当者別売上</CardTitle>
-              <CardDescription className="text-slate-400">担当者ごとの売上パフォーマンス</CardDescription>
+              <CardDescription className="text-slate-400">担当者ごとの売上パフォーマンス（クリックで詳細表示）</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -256,8 +267,8 @@ export default function Dashboard() {
                     }}
                   />
                   <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                  <Bar dataKey="total" fill="#10b981" name="総売上" />
-                  <Bar dataKey="count" fill="#f59e0b" name="成約件数" />
+                  <Bar dataKey="total" fill="#10b981" name="総売上" onClick={handleBarClick} cursor="pointer" />
+                  <Bar dataKey="count" fill="#f59e0b" name="成約件数" onClick={handleBarClick} cursor="pointer" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -266,7 +277,7 @@ export default function Dashboard() {
           <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-slate-200">営業担当者別平均売上</CardTitle>
-              <CardDescription className="text-slate-400">1件あたりの平均成約金額</CardDescription>
+              <CardDescription className="text-slate-400">1件あたりの平均成約金額（クリックで詳細表示）</CardDescription>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -283,7 +294,7 @@ export default function Dashboard() {
                     }}
                   />
                   <Legend wrapperStyle={{ color: '#94a3b8' }} />
-                  <Bar dataKey="average" fill="#06b6d4" name="平均売上" />
+                  <Bar dataKey="average" fill="#06b6d4" name="平均売上" onClick={handleBarClick} cursor="pointer" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -334,6 +345,13 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* 営業担当者詳細モーダル */}
+        <SalesPersonDetailModal
+          salesPersonName={selectedSalesPerson}
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
       </div>
     </div>
   )
