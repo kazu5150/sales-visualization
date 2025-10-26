@@ -95,6 +95,24 @@ export default function Dashboard() {
     amount,
   }))
 
+  // 営業担当者別売上
+  const salesPersonSales = salesData.reduce((acc, record) => {
+    const salesPerson = record.sales_person
+    if (!acc[salesPerson]) {
+      acc[salesPerson] = { total: 0, count: 0 }
+    }
+    acc[salesPerson].total += Number(record.total_amount)
+    acc[salesPerson].count += 1
+    return acc
+  }, {} as Record<string, { total: number; count: number }>)
+
+  const salesPersonChartData = Object.entries(salesPersonSales).map(([name, data]) => ({
+    name,
+    total: data.total,
+    count: data.count,
+    average: Math.round(data.total / data.count),
+  }))
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
@@ -210,6 +228,62 @@ export default function Dashboard() {
                   />
                   <Legend wrapperStyle={{ color: '#94a3b8' }} />
                   <Bar dataKey="amount" fill="#8b5cf6" name="売上金額" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* 営業担当者別チャート */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-slate-200">営業担当者別売上</CardTitle>
+              <CardDescription className="text-slate-400">担当者ごとの売上パフォーマンス</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={salesPersonChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                  <Bar dataKey="total" fill="#10b981" name="総売上" />
+                  <Bar dataKey="count" fill="#f59e0b" name="成約件数" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-slate-200">営業担当者別平均売上</CardTitle>
+              <CardDescription className="text-slate-400">1件あたりの平均成約金額</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={salesPersonChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="name" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#1e293b',
+                      border: '1px solid #334155',
+                      borderRadius: '8px',
+                      color: '#e2e8f0'
+                    }}
+                  />
+                  <Legend wrapperStyle={{ color: '#94a3b8' }} />
+                  <Bar dataKey="average" fill="#06b6d4" name="平均売上" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
