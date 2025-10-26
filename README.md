@@ -4,13 +4,16 @@ Googleスプレッドシートに入力した営業データをリアルタイ�
 
 ## デモ
 
-![Dashboard Screenshot](https://via.placeholder.com/800x400?text=Sales+Visualization+Dashboard)
+![Dashboard Screenshot](public/images/dashboard-screenshot.png)
 
 ## 特徴
 
 - **リアルタイム同期** - Googleスプレッドシートでデータを入力すると即座にダッシュボードに反映
 - **モダンなUI** - Shadcn/uiを使用したダークテーマのクールなデザイン
-- **データ可視化** - Rechartsによる美しいグラフ表示
+- **データ可視化** - Rechartsによる美しいグラフ表示（棒グラフ + 累積ライン）
+- **期間選択** - 日別/週別/月別でデータを切り替え表示
+- **営業担当者サマリー** - 各担当者のKPIとスパークラインチャートをカード表示
+- **詳細モーダル** - 営業担当者をクリックして詳細な成績を確認
 - **自動集計** - KPI（総売上、注文数、平均注文額、顧客数）を自動計算
 - **レスポンシブ** - PC、タブレット、スマホに対応
 
@@ -79,14 +82,18 @@ npm run dev
 
 ### 2. Googleスプレッドシート連携
 
-詳細な手順は [`gas-script/SETUP_GUIDE.md`](gas-script/SETUP_GUIDE.md) を参照してください。
+詳細な手順は [`gas-script/README.md`](gas-script/README.md) を参照してください。
 
 **概要：**
 1. Googleスプレッドシートを作成
-2. シート名を「営業データ」に設定
+2. 2つのシートを作成：
+   - 「営業データ」シート - 日々の売上データ
+   - 「営業担当者」シート - 営業担当者の情報
 3. ヘッダー行を入力
-4. Apps Scriptに `Code.gs` をコピー
+4. Apps Scriptに `Code-Extended.gs` をコピー
 5. トリガーを設定
+
+これで、両方のシートからSupabaseへ自動同期されます。
 
 ## 使い方
 
@@ -104,8 +111,11 @@ npm run dev
 ### ダッシュボードの見方
 
 - **KPIカード** - 総売上、注文数、平均注文額、顧客数を表示
-- **日別売上推移** - 時系列での売上変動をグラフ化
+- **売上推移** - 日別/週別/月別で切り替え可能、棒グラフ（期間売上）+ 折れ線（累積売上）
 - **カテゴリ別売上** - 商品カテゴリごとの売上を棒グラフで表示
+- **営業担当者サマリー** - 各担当者のKPI（総売上、平均売上、受注件数）とスパークラインチャート
+  - カードをクリックすると詳細モーダルが開きます
+  - モーダルでは期間別の詳細分析、取引履歴、達成率などを確認できます
 - **最新データ** - 直近10件の取引履歴をテーブル表示
 
 ## データベーススキーマ
@@ -124,6 +134,20 @@ npm run dev
 | sales_person | TEXT | NOT NULL | 営業担当者 |
 | category | TEXT | NULLABLE | カテゴリ |
 | notes | TEXT | NULLABLE | 備考 |
+| created_at | TIMESTAMPTZ | DEFAULT now() | 作成日時 |
+| updated_at | TIMESTAMPTZ | DEFAULT now() | 更新日時 |
+
+### sales_people テーブル
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | UUID | PRIMARY KEY | 自動生成ID |
+| name | TEXT | UNIQUE, NOT NULL | 営業担当者名 |
+| department | TEXT | NULLABLE | 部署 |
+| email | TEXT | NULLABLE | メールアドレス |
+| monthly_target | NUMERIC | DEFAULT 0 | 月次目標 |
+| quarterly_target | NUMERIC | DEFAULT 0 | 四半期目標 |
+| hire_date | DATE | NULLABLE | 入社日 |
 | created_at | TIMESTAMPTZ | DEFAULT now() | 作成日時 |
 | updated_at | TIMESTAMPTZ | DEFAULT now() | 更新日時 |
 
